@@ -1,0 +1,44 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Priest-Chord-Generator</title>
+  <script src="https://unpkg.com/tone/build/Tone.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/midiwriter-js@2.1.4/dist/MidiWriter.min.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+    #roll { display: grid; grid-template-columns: repeat(16, 40px); grid-auto-rows: 30px; gap: 2px; margin-top: 20px; }
+    .note { background: #222; border: 1px solid #555; cursor: pointer; }
+    .active { background: #e60000; }
+    button, select { margin: 10px; padding: 10px 20px; font-size: 16px; background: #e60000; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover, select:hover { background: #b30000; }
+    select { background: #000; border: 1px solid #e60000; }
+  </style>
+</head>
+<body>
+  <h1>🎹 Priest-Chord-Generator</h1>
+  <button onclick="generateChords()">Generate Chord Progression</button>
+  <button onclick="playRoll()">Play</button>
+  <button onclick="exportMIDI()">Download MIDI</button>
+  <select id="instrument" onchange="changeInstrument()">
+    <option value="PolySynth">Piano (PolySynth)</option>
+    <option value="Synth">Synth Lead</option>
+    <option value="AMSynth">Pad (AMSynth)</option>
+  </select>
+  <div id="roll"></div>
+  <script>
+    const roll = document.getElementById('roll');
+    const notes = ['C4','D#4','F4','G4','A#4','C5','D#5','F5'];
+    let grid = Array(8).fill().map(() => Array(16).fill(false));
+    let synth = new Tone.PolySynth().toDestination();
+    function renderGrid() { roll.innerHTML = ''; for (let row = 0; row < 8; row++) { for (let col = 0; col < 16; col++) { const cell = document.createElement('div'); cell.classList.add('note'); if (grid[row][col]) cell.classList.add('active'); cell.onclick = () => { grid[row][col] = !grid[row][col]; renderGrid(); } roll.appendChild(cell); } } }
+    function generateChords() { grid = Array(8).fill().map(() => Array(16).fill(false)); const progressions = [['C4','D#4','G4'],['D#4','F4','A#4'],['F4','A#4','C5'],['G4','C5','D#5']]; for (let i = 0; i < 4; i++) { const chord = progressions[Math.floor(Math.random()*progressions.length)]; for (let note of chord) { const row = notes.indexOf(note); grid[row][i*4] = true; grid[row][i*4+1] = true; } } renderGrid(); }
+    async function playRoll() { Tone.Transport.stop(); Tone.Transport.cancel(); Tone.Transport.bpm.value = 100; Tone.Transport.scheduleRepeat((time) => { let step = Math.floor(Tone.Transport.seconds * 4) % 16; const chord = []; for (let row = 0; row < 8; row++) { if (grid[row][step]) chord.push(notes[row]); } if (chord.length) synth.triggerAttackRelease(chord, '8n', time); }, '16n'); Tone.Transport.start(); }
+    function exportMIDI() { const track = new MidiWriter.Track(); track.setTempo(100); for (let col = 0; col < 16; col++) { const chord = []; for (let row = 0; row < 8; row++) { if (grid[row][col]) chord.push(notes[row]); } if (chord.length) { track.addEvent(new MidiWriter.NoteEvent({pitch: chord, duration: '8'})); } } const write = new MidiWriter.Writer(track); const blob = new Blob([write.buildFile()], {type: 'audio/midi'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'priest_chord_progression.mid'; a.click(); URL.revokeObjectURL(url); }
+    function changeInstrument() { const selected = document.getElementById('instrument').value; if (selected === 'PolySynth') synth = new Tone.PolySynth().toDestination(); if (selected === 'Synth') synth = new Tone.Synth().toDestination(); if (selected === 'AMSynth') synth = new Tone.AMSynth().toDestination(); }
+    renderGrid();
+  </script>
+</body>
+</html>
